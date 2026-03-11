@@ -1,6 +1,7 @@
 """Fantasy acquisition API"""
 
 from fastapi import FastAPI
+from starlette.concurrency import run_in_threadpool
 import onnxruntime as rt
 import numpy as np
 from schemas import FantasyAcquisitionFeatures, PredictionOutput
@@ -18,13 +19,12 @@ Get predictions of player acquisition cost.
 """
 
 
-
 # Load the ONNX model
-sess_10 = rt.InferenceSession("acquisition_model_10.onnx", 
+sess_10 = rt.InferenceSession("acquisition_model_10.onnx",
                               providers=["CPUExecutionProvider"])
-sess_50 = rt.InferenceSession("acquisition_model_50.onnx", 
+sess_50 = rt.InferenceSession("acquisition_model_50.onnx",
                               providers=["CPUExecutionProvider"])
-sess_90 = rt.InferenceSession("acquisition_model_90.onnx", 
+sess_90 = rt.InferenceSession("acquisition_model_90.onnx",
                               providers=["CPUExecutionProvider"])
 
 # Get the input and output names of the model
@@ -42,6 +42,7 @@ app = FastAPI(
     version="0.1",
 )
 
+
 @app.get(
     "/",
     summary="Check to see if the Fantasy acquisition API is running",
@@ -50,12 +51,33 @@ app = FastAPI(
     operation_id="v0_health_check",
     tags=["analytics"],
 )
-def root():
+async def root():
     return {"message": "API health check successful"}
 
 
+def run_prediction(features: FantasyAcquisitionFeatures) -> PredictionOutput:
+    # Convert Pydantic model to NumPy array
+    input_data = np.array([[features.waiver_value_tier,
+                            features.fantasy_regular_season_weeks_remaining,
+                            features.league_budget_pct_remaining]],
+                          dtype=np.int64)
+
+    # Perform ONNX inference
+    pred_onx_10 = sess_10.run([label_name_10], {input_name_10: input_data})[0]
+    pred_onx_50 = sess_50.run([label_name_50], {input_name_50: input_data})[0]
+    pred_onx_90 = sess_90.run([label_name_90], {input_name_90: input_data})[0]
+
+    # Return prediction as a Pydantic response model
+    return PredictionOutput(winning_bid_10th_percentile=round(
+                                float(pred_onx_10.reshape(-1)[0]), 2),
+                            winning_bid_50th_percentile=round(
+                                float(pred_onx_50.reshape(-1)[0]), 2),
+                            winning_bid_90th_percentile=round(
+                                float(pred_onx_90.reshape(-1)[0]), 2))
+
+
 # Define the prediction route
-@app.post("/predict/", 
+@app.post("/predict/",
           response_model=PredictionOutput,
           summary="Predict the cost of acquiring a player",
           description="""Use this endpoint to predict the range of cost to acquire a player in fantasy football.""",
@@ -63,25 +85,5 @@ def root():
           operation_id="v0_predict",
           tags=["prediction"],
 )
-def predict(features: FantasyAcquisitionFeatures):
-    # Convert Pydantic model to NumPy array
-    input_data = np.array([[features.waiver_value_tier, 
-                            features.fantasy_regular_season_weeks_remaining, 
-                            features.league_budget_pct_remaining]], 
-                            dtype=np.int64)
-
-    # Perform ONNX inference
-    pred_onx_10 = sess_10.run([label_name_10], {input_name_10: input_data})[0]
-    # Perform ONNX inference
-    pred_onx_50 = sess_50.run([label_name_50], {input_name_50: input_data})[0]
-# Perform ONNX inference
-    pred_onx_90 = sess_90.run([label_name_90], {input_name_90: input_data})[0]
-
-
-    # Return prediction as a Pydantic response model
-    return PredictionOutput(winning_bid_10th_percentile=round(
-                                float(pred_onx_10.reshape(-1)[0]),2),
-                            winning_bid_50th_percentile=round(
-                                float(pred_onx_50.reshape(-1)[0]),2),
-                            winning_bid_90th_percentile=round(
-                                float(pred_onx_90.reshape(-1)[0]), 2))
+async def predict(features: FantasyAcquisitionFeatures):
+    return await run_in_threadpool(run_prediction, features)
