@@ -1,13 +1,17 @@
-"""Database configuration"""
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./fantasy_data.db"
+DATABASE_URL = "sqlite+aiosqlite:///./fantasy_data.db"
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+engine = create_async_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
 )
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 Base = declarative_base()
