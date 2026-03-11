@@ -2,7 +2,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-from main import app
+from inference_api.main_inference_api import app
 
 
 @pytest_asyncio.fixture
