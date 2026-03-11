@@ -18,22 +18,16 @@ Get information about health of the API.
 Get predictions of player acquisition cost.
 """
 
+sess_10 = None
+sess_50 = None
+sess_90 = None
 
-# Load the ONNX model
-sess_10 = rt.InferenceSession("acquisition_model_10.onnx",
-                              providers=["CPUExecutionProvider"])
-sess_50 = rt.InferenceSession("acquisition_model_50.onnx",
-                              providers=["CPUExecutionProvider"])
-sess_90 = rt.InferenceSession("acquisition_model_90.onnx",
-                              providers=["CPUExecutionProvider"])
-
-# Get the input and output names of the model
-input_name_10 = sess_10.get_inputs()[0].name
-label_name_10 = sess_10.get_outputs()[0].name
-input_name_50 = sess_50.get_inputs()[0].name
-label_name_50 = sess_50.get_outputs()[0].name
-input_name_90 = sess_90.get_inputs()[0].name
-label_name_90 = sess_90.get_outputs()[0].name
+input_name_10 = None
+label_name_10 = None
+input_name_50 = None
+label_name_50 = None
+input_name_90 = None
+label_name_90 = None
 
 # FastAPI constructor with additional details added for OpenAPI Specification
 app = FastAPI(
@@ -41,6 +35,37 @@ app = FastAPI(
     title="Fantasy acquisition API",
     version="0.1",
 )
+
+
+@app.on_event("startup")
+def load_models():
+    global sess_10, sess_50, sess_90
+    global input_name_10, label_name_10
+    global input_name_50, label_name_50
+    global input_name_90, label_name_90
+
+    sess_options = rt.SessionOptions()
+    sess_options.intra_op_num_threads = 1
+    sess_options.inter_op_num_threads = 1
+
+    # Load the ONNX models
+    sess_10 = rt.InferenceSession("acquisition_model_10.onnx",
+                                  sess_options,
+                                  providers=["CPUExecutionProvider"])
+    sess_50 = rt.InferenceSession("acquisition_model_50.onnx",
+                                  sess_options,
+                                  providers=["CPUExecutionProvider"])
+    sess_90 = rt.InferenceSession("acquisition_model_90.onnx",
+                                  sess_options,
+                                  providers=["CPUExecutionProvider"])
+
+    # Get the input and output names of the models
+    input_name_10 = sess_10.get_inputs()[0].name
+    label_name_10 = sess_10.get_outputs()[0].name
+    input_name_50 = sess_50.get_inputs()[0].name
+    label_name_50 = sess_50.get_outputs()[0].name
+    input_name_90 = sess_90.get_inputs()[0].name
+    label_name_90 = sess_90.get_outputs()[0].name
 
 
 @app.get(
