@@ -1,0 +1,10 @@
+#model training
+skl2onnx
+onnxruntime
+scikit-learn
+numpy
+pandas
+#model serving
+pydantic>=2.4.0
+fastapi[standard]>=0.115.0
+uvicorn>=0.23.0
