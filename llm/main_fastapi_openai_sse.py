@@ -1,7 +1,7 @@
 import os
 from collections.abc import AsyncIterable
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
@@ -31,6 +31,7 @@ class ChatRequest(BaseModel):
 async def root():
     return {"message": "API health check successful"}
 
+
 @app.post("/chat/stream", response_class=EventSourceResponse)
 async def chat_stream(payload: ChatRequest) -> AsyncIterable[ServerSentEvent]:
     try:
@@ -48,6 +49,7 @@ async def chat_stream(payload: ChatRequest) -> AsyncIterable[ServerSentEvent]:
                     yield ServerSentEvent(event="done", data=event.content)
 
         yield ServerSentEvent(raw_data="[DONE]")
+
     except Exception as exc:
         yield ServerSentEvent(event="error", data=str(exc))
         yield ServerSentEvent(raw_data="[DONE]")
@@ -70,19 +72,23 @@ async def chat(payload: ChatRequest) -> dict[str, str]:
     return {"text": text}
 
 
-@app.get("/completions/stream", response_class=EventSourceResponse)
-async def completions_stream(prompt: str = Query(...)) -> AsyncIterable[ServerSentEvent]:
-
+@app.post("/completions/stream", response_class=EventSourceResponse)
+async def completions_stream(payload: ChatRequest) -> AsyncIterable[ServerSentEvent]:
     try:
         stream = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+            model=payload.model,
+            messages=[
+                {"role": "system", "content": payload.system_prompt},
+                {"role": "user", "content": payload.prompt},
+            ],
             stream=True,
         )
 
         async for chunk in stream:
-            delta = chunk.choices[0].delta
+            if not chunk.choices:
+                continue
 
+            delta = chunk.choices[0].delta
             if delta and delta.content:
                 yield ServerSentEvent(data=delta.content)
 
