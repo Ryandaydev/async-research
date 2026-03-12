@@ -1,0 +1,3 @@
+openai
+nest_asyncio 
+pandas
